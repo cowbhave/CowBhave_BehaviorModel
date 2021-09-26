@@ -2,7 +2,7 @@
 
 Models for classificaion of the feeding behavior.
 
-Function library FeedingBehavior_NNlib.py includes the following models:
+Function library *FeedingBehavior_NNlib.py* includes the following models:
 
 1. CNN with 2 convolutional layers from https://machinelearningmastery.com/cnn-models-for-human-activity-recognition-time-series-classification/.
 
