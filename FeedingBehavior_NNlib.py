@@ -44,7 +44,7 @@ def CNNModelDefine(ModelName,trainX,trainy):
         model.add(LSTM(128, activation='tanh'))
         model.add(Dense(n_outputs, activation='softmax', dtype='float32'))
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=["accuracy", "categorical_accuracy"])
-    elif ModelName=="NN4":
+    elif ModelName=="NN4": #
         model = Sequential()
         model.add(Conv1D(filters=64, kernel_size=32, strides=1, activation='relu', input_shape = (n_timesteps, n_features)))
         model.add(Conv1D(filters=64, kernel_size=32, strides=2, activation='relu'))
@@ -395,3 +395,12 @@ def PresentPerformance(LabelReference,LabelPredicted,Classes,ClassNames):
     print(numpy.squeeze(ConfusionMatr.astype(int)))
 
     return PerfVect, ConfusionMatr
+
+def RandomForestFeatures(Ax,Ay,Az,Label):
+    Ax_Mean=numpy.mean(Ax, axis=1)
+    Ay_Mean=numpy.mean(Ay, axis=1)
+    Az_Mean=numpy.mean(Az, axis=1)
+    Features=numpy.dstack((Ax_Mean,Ay_Mean,Az_Mean))
+    Features=numpy.squeeze(Features)
+    Label=numpy.squeeze(Label)
+    return Features,Label
