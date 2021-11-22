@@ -6,6 +6,7 @@ from FeedingBehavior_NNlib import *
 import fnmatch, os
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from sklearn import svm
 import numpy
 # from tensorflow.keras.models import Sequential
 # from tensorflow.keras.layers import Dense, Flatten, Dropout, Conv1D, MaxPooling1D
@@ -23,132 +24,110 @@ WindowN=int(WindowSize*Freq)
 print("Interval length " + str(WindowSize) + "sec")
 FeedingM, RuminatingM, NothingM, DrinkingM = 1, 2, 3, 4
 
-# DataFolder="D:\CowBhave\Data_Exp08_11_2019\Labeled"
-DataFolder="D:\\CowBhave\\Data_Exp15_02_2021\\Labeled"
-DataSetName="Barn2"
-ModelName="RF1"#"NN1"#
+# TrainingDataFolder="D:\CowBhave\Data_Exp08_11_2019\Labeled"
+TrainingDataFolder,TrainingDataSetName="D:\\CowBhave\\Data_Exp15_02_2021\\Labeled","Barn2 interpolated frequency"
+# TrainingDataFolder="D:\\CowBhave\\Pavlovic21\\Labeled"
+
+ModelName="NN1"#"SVM1"#"RF1"#
 ModelFolder="D:\CowBhave\Models"
 print('Reading')
-TagNo, CowNo, TimeStamp, Ax, Ay, Az, Label = ReadLabeledDataFiles(DataFolder,'AccDataLabeled_Tag')
+TagNo, CowNo, TimeStamp, Ax, Ay, Az, Label = ReadLabeledDataFiles(TrainingDataFolder,'AccDataLabeled_Tag',Freq)
 CowNoList=numpy.unique(CowNo)
 print('Cow no list')
 print(CowNoList)
 print('Slicing')
 AxSliced, AySliced, AzSliced, LabelSliced, TagNoSliced, CowNoSliced, TimeStampSliced=LabeledDataSlicing(Ax, Ay, Az, Label, WindowN, 0.5, TagNo, CowNo, TimeStamp)
 
-print('Balancing')
-# AxSliced, AySliced, AzSliced, LabelSliced, CowNoSliced=DataBalance(AxSliced, AySliced, AzSliced, LabelSliced, CowNoSliced, TimeStampSliced)
-# AxSliced, AySliced, AzSliced, LabelSliced, CowNoSliced=AccAugmentation(AxSliced, AySliced, AzSliced, LabelSliced, CowNoSliced, 5)
-# # for i in range(0,10):
-# #     plt.scatter(range(WindowN), AxSliced[i])
-# #     plt.scatter(range(WindowN), AySliced[i])
-# #     plt.scatter(range(WindowN), AzSliced[i])
-# # for i in range(0,10):
-# #     plt.scatter(range(WindowN*(i-1),WindowN*i), AxSliced[i], color='black')
-# #     plt.scatter(range(WindowN*(i-1),WindowN*i), AySliced[i], color='blue')
-# #     plt.scatter(range(WindowN*(i-1),WindowN*i), AzSliced[i], color='green')
-# # # plt.figure()
-# # # for i in range(0,50):
-# # #     plt.scatter(range(WindowN*(i-1),WindowN*i), AxSliced[i], color='black')
-# # #     plt.scatter(range(WindowN*(i-1),WindowN*i), AySliced[i], color='blue')
-# # #     plt.scatter(range(WindowN*(i-1),WindowN*i), AzSliced[i], color='green')
-# # plt.show()
-
-kf = KFold(n_splits=5)
-epochs, batch_size = 20, 32
+kf = KFold(n_splits=10)
 Fold_i=0
-# for Fold_i in range(len(FoldCowNoList[0])*0+1):
 for train_index, test_index in kf.split(CowNoList):
     FoldCowNoList=CowNoList[train_index]
     Fold_i=Fold_i+1
     Vers_i=0
-    # print("Cows "+str(FoldCowNoList[Fold_i])+", fold "+str(Fold_i)+", version "+str(Vers_i))
-    print("Cows "+str(FoldCowNoList)+", fold "+str(Fold_i)+", version "+str(Vers_i))
-    AxSlicedTrainFold,AySlicedTrainFold,AzSlicedTrainFold,LabelSlicedTrainFold=[],[],[],[]
-    AxSlicedTestFold,AySlicedTestFold,AzSlicedTestFold,LabelSlicedTestFold=[],[],[],[]
+    print("Cows "+str(FoldCowNoList))
+    print("Fold "+str(Fold_i)+", version "+str(Vers_i))
+
+    AxSlicedTrainingFold,AySlicedTrainingFold,AzSlicedTrainingFold,LabelSlicedTrainingFold,CowNoSlicedTrainingFold=[],[],[],[],[]
+    AxSlicedValidationFold,AySlicedValidationFold,AzSlicedValidationFold,LabelSlicedValidationFold=[],[],[],[]
     for i in range(len(LabelSliced)):        
-        # if CowNoSliced[i] in FoldCowNoList[Fold_i]:
         if CowNoSliced[i] in FoldCowNoList:
-            AxSlicedTrainFold.append(AxSliced[i])
-            AySlicedTrainFold.append(AySliced[i])
-            AzSlicedTrainFold.append(AzSliced[i])
-            LabelSlicedTrainFold.append(LabelSliced[i])
+            AxSlicedTrainingFold.append(AxSliced[i])
+            AySlicedTrainingFold.append(AySliced[i])
+            AzSlicedTrainingFold.append(AzSliced[i])
+            LabelSlicedTrainingFold.append(LabelSliced[i])
+            CowNoSlicedTrainingFold.append(CowNoSliced[i])
         else:
-            AxSlicedTestFold.append(AxSliced[i])
-            AySlicedTestFold.append(AySliced[i])
-            AzSlicedTestFold.append(AzSliced[i])
-            LabelSlicedTestFold.append(LabelSliced[i])    
+            AxSlicedValidationFold.append(AxSliced[i])
+            AySlicedValidationFold.append(AySliced[i])
+            AzSlicedValidationFold.append(AzSliced[i])
+            LabelSlicedValidationFold.append(LabelSliced[i])
+        
+    print('Balancing')
+    AxSlicedTrainingFold, AySlicedTrainingFold, AzSlicedTrainingFold, LabelSlicedTrainingFold, CowNoSlicedTrainingFold=DataBalance(AxSlicedTrainingFold, AySlicedTrainingFold, AzSlicedTrainingFold, LabelSlicedTrainingFold, CowNoSlicedTrainingFold)
+    AxSlicedTrainingFold, AySlicedTrainingFold, AzSlicedTrainingFold, LabelSlicedTrainingFold, CowNoSlicedTrainingFold=AccAugmentation(AxSlicedTrainingFold, AySlicedTrainingFold, AzSlicedTrainingFold, LabelSlicedTrainingFold, CowNoSlicedTrainingFold, 5)
     
     if ModelName in ["NN1", "NN2", "NN3", "NN4"]:
-        print('Training')
-        ASlicedTrainFold=numpy.dstack((AxSlicedTrainFold,AySlicedTrainFold,AzSlicedTrainFold))
-        # print(ASlicedTrainFold.shape)
-        trainX, testX, trainy, testy=train_test_split(ASlicedTrainFold,LabelSlicedTrainFold,test_size=0.2, random_state=0, stratify=LabelSlicedTrainFold)
-        print("Test sample number " + str(len(testX)) + ", train sample number " + str(len(trainX)))
-        trainy =numpy.asarray(trainy) - 1
-        testy = numpy.asarray(testy) - 1
-        trainy = to_categorical(trainy)
-        testy = to_categorical(testy)
+        print(ModelName+' '+'Training')
+        epochs, batch_size = 20, 32
 
-        model=CNNModelDefine(ModelName,trainX,trainy)
-        model.fit(trainX, trainy, epochs=epochs, batch_size=batch_size, verbose=1)
-        _, score = model.evaluate(testX, testy, batch_size=batch_size, verbose=0)
-        print('>#%d: %.3f' % (Fold_i+1, score* 100.0))
-        model.save(ModelFolder+"\\"+ModelName+DataSetName+"WS"+str(WindowSize)+"Fold"+str(Fold_i)+"V"+str(Vers_i))
+        ASlicedTrainingFold=numpy.dstack((AxSlicedTrainingFold,AySlicedTrainingFold,AzSlicedTrainingFold))
+        # trainX, testX, trainy, testy=train_test_split(ASlicedTrainingFold,LabelSlicedTrainingFold,test_size=0.2, random_state=0, stratify=LabelSlicedTrainingFold)
+        # print("Test sample number " + str(len(testX)) + ", train sample number " + str(len(trainX)))
+        LabelSlicedTrainingFold =numpy.asarray(LabelSlicedTrainingFold) - 1
+        # testy = numpy.asarray(testy) - 1
+        LabelSlicedTrainingFold = to_categorical(LabelSlicedTrainingFold)
+        # testy = to_categorical(testy)
+
+        model=CNNModelDefine(ModelName,ASlicedTrainingFold,LabelSlicedTrainingFold)
+        model.fit(ASlicedTrainingFold, LabelSlicedTrainingFold, epochs=epochs, batch_size=batch_size, verbose=0)
+        # _, score = model.evaluate(testX, testy, batch_size=batch_size, verbose=0)
+        # print('>#%d: %.3f' % (Fold_i+1, score* 100.0))
+        model.save(ModelFolder+"\\"+ModelName+TrainingDataSetName+"WS"+str(WindowSize)+"Fold"+str(Fold_i)+"V"+str(Vers_i))
 
         print('Validating')
-        ASlicedTestFold=numpy.dstack((AxSlicedTestFold,AySlicedTestFold,AzSlicedTestFold))
-        FeedingBehaviorPredictedP=model.predict(ASlicedTestFold)
+        ASlicedValidationFold=numpy.dstack((AxSlicedValidationFold,AySlicedValidationFold,AzSlicedValidationFold))
+        FeedingBehaviorPredictedP=model.predict(ASlicedValidationFold)
         FeedingBehaviorPredicted=list()
         for i in range(len(FeedingBehaviorPredictedP)):
             m,k=MaxInd(FeedingBehaviorPredictedP[i])
             FeedingBehaviorPredicted.append(k+1)
 
-        FeedingBehaviorPredicted=scipy.signal.medfilt(FeedingBehaviorPredicted,5)
+    elif ModelName=="RF1" or ModelName=="SVM1":
+        print(ModelName+' '+'Training')
+        FeaturesTrainFold,LabelSlicedTrainingFold=AccelerationFeatures(AxSlicedTrainingFold,AySlicedTrainingFold,AzSlicedTrainingFold,LabelSlicedTrainingFold)
 
-    elif ModelName=="RF1":
-        print('Training')
-        # AxSlicedTrainFold_Mean=numpy.mean(AxSlicedTrainFold, axis=1)
-        # AySlicedTrainFold_Mean=numpy.mean(AySlicedTrainFold, axis=1)
-        # AzSlicedTrainFold_Mean=numpy.mean(AzSlicedTrainFold, axis=1)
-        # FeaturesTrainFold=numpy.dstack((AxSlicedTrainFold_Mean,AySlicedTrainFold_Mean,AzSlicedTrainFold_Mean))
-        # FeaturesTrainFold=numpy.squeeze(FeaturesTrainFold)
-        # LabelSlicedTrainFold=numpy.squeeze(LabelSlicedTrainFold)
-        FeaturesTrainFold,LabelSlicedTrainFold=RandomForestFeatures(AxSlicedTrainFold,AySlicedTrainFold,AzSlicedTrainFold,LabelSlicedTrainFold)
-
-        trainX, testX, trainy, testy=train_test_split(FeaturesTrainFold,LabelSlicedTrainFold,test_size=0.2, random_state=0, stratify=LabelSlicedTrainFold)
+        trainX, testX, trainy, testy=train_test_split(FeaturesTrainFold,LabelSlicedTrainingFold,test_size=0.2, random_state=0, stratify=LabelSlicedTrainingFold)
         print("Test sample number " + str(len(testX)) + ", train sample number " + str(len(trainX)))
         trainy=trainy - 1
         testy = testy - 1
 
-        clf=RandomForestClassifier(n_estimators=100)
+        if ModelName=="RF1":
+            clf=RandomForestClassifier(n_estimators=50) #n_estimators=250, Kaler 19; n_estimators=2000, ?max_features=15, Riabof 20; 8, 128, 1 Walton 19;
+        elif ModelName=="SVM1":
+            # clf=svm.SVC()
+            # clf=svm.SVC(kernel='poly', degree=8)
+            clf=svm.SVC(kernel='rbf', C=128, gamma=0.05) #Kaler 19; C=128, gamma=0.05, Riaboff 20; Trung 18;
+            # clf=svm.SVC(kernel='sigmoid')
+
         clf.fit(trainX,trainy)
-        joblib.dump(clf, ModelFolder+"\\"+ModelName+DataSetName+"WS"+str(WindowSize)+"Fold"+str(Fold_i)+"V"+str(Vers_i)+".joblib")
+        joblib.dump(clf, ModelFolder+"\\"+ModelName+TrainingDataSetName+"WS"+str(WindowSize)+"Fold"+str(Fold_i)+"V"+str(Vers_i)+".joblib")
         # clf = joblib.load("./random_forest.joblib")
 
         print('Validating')
-        # AxSlicedTestFold_Mean=numpy.mean(AxSlicedTestFold, axis=1)
-        # AySlicedTestFold_Mean=numpy.mean(AySlicedTestFold, axis=1)
-        # AzSlicedTestFold_Mean=numpy.mean(AzSlicedTestFold, axis=1)
-        # FeaturesTestFold=numpy.dstack((AxSlicedTestFold_Mean,AySlicedTestFold_Mean,AzSlicedTestFold_Mean))
-        # FeaturesTestFold=numpy.squeeze(FeaturesTestFold)
-        # LabelSlicedTestFold=numpy.squeeze(LabelSlicedTestFold)
-        FeaturesTestFold,LabelSlicedTestFold=RandomForestFeatures(AxSlicedTestFold,AySlicedTestFold,AzSlicedTestFold,LabelSlicedTestFold)
+        FeaturesTestFold,LabelSlicedValidationFold=AccelerationFeatures(AxSlicedValidationFold,AySlicedValidationFold,AzSlicedValidationFold,LabelSlicedValidationFold)
 
-        FeedingBehaviorPredicted=clf.predict(FeaturesTestFold)+1
+        FeedingBehaviorPredicted=clf.predict(FeaturesTestFold)+1    
 
-    # print(len(LabelSlicedTestFold))
-    # print(len(FeedingBehaviorPredicted))
-    PerfVect, ConfusionMatr=PresentPerformance(LabelSlicedTestFold,FeedingBehaviorPredicted,[FeedingM, RuminatingM, NothingM],["Feeding", "Ruminating", "Nothing"])
+    FeedingBehaviorPredicted=scipy.signal.medfilt(FeedingBehaviorPredicted,5)
+    PerfVect, ConfusionMatr, TotAcc=PresentPerformance(LabelSlicedValidationFold,FeedingBehaviorPredicted,[FeedingM, RuminatingM, NothingM],["Feeding", "Ruminating", "Nothing"])
     now = datetime.now()
-    dt_string = now.strftime("%Y%m%d%H%M%S")
-    s=dt_string+";"+DataSetName+";"+str(WindowSize)+";"+str(Fold_i)+";"+str(Vers_i)+";"
+    dt_string = now.strftime("%Y%m%d_%H%M%S")
+    s=dt_string+";"+TrainingDataSetName+";"+TrainingDataSetName+";"+str(WindowSize)+";"+str(Fold_i)+";"+str(Vers_i)+";"+str(TotAcc)+";"
     for i in range(len(ConfusionMatr)):
         for j in range(len(ConfusionMatr)):
             s=s+str(ConfusionMatr[i,j])+";"
     fileH=open(ModelFolder+"\\"+ModelName+'_Performance.csv', 'a')
-    fileH.write(s)
+    fileH.write(s+'\n')
     fileH.close()
-
 
 print('End')
