@@ -10,6 +10,7 @@ import datetime
 from datetime import datetime
 from scipy import signal
 from scipy import interpolate
+from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 # python FeedingBehavior_NNlib.py
 
@@ -17,8 +18,8 @@ def CNNModelDefine(ModelName,trainX,trainy):
     n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainy.shape[1]
     if ModelName=="NN1": #https://machinelearningmastery.com/cnn-models-for-human-activity-recognition-time-series-classification/
         model = Sequential()
-        model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(n_timesteps,n_features)))
-        model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
+        model.add(Conv1D(filters=64, kernel_size=3+5*0+11*0, activation='relu', input_shape=(n_timesteps,n_features)))
+        model.add(Conv1D(filters=64, kernel_size=3+5*0+11*0, activation='relu'))
         model.add(Dropout(0.5))
         model.add(MaxPooling1D(pool_size=2))
         model.add(Flatten())
@@ -92,7 +93,7 @@ def ReadLabeledDataFiles(DataFolder,Mask,RefFreq):
                 rows=[]
                 for row in csvreader:
                     rows.append(row)
-
+            
             for i in range(len(rows)):
                 cowNo.append(cowno)
                 tagNo.append(tagno)
@@ -102,9 +103,9 @@ def ReadLabeledDataFiles(DataFolder,Mask,RefFreq):
                 ay.append(int(rows[i][2]))
                 az.append(int(rows[i][3]))
                 label.append(int(rows[i][4]))
-
+    
             ax, ay, az=AccelerationFiltering(ax, ay, az)
-            ax, ay, az, timeStamp, label, tagNo, cowNo=AccelerationSamplingFitting(ax, ay, az, timeStamp, label, tagNo, cowNo, RefFreq)
+            # ax, ay, az=MissingSampleImputation(ax, ay, az, timeStamp)
 
             CowNo=list(CowNo)+list(cowNo)
             TagNo=list(TagNo)+list(tagNo)
@@ -117,50 +118,6 @@ def ReadLabeledDataFiles(DataFolder,Mask,RefFreq):
     Label=numpy.asarray(Label)
     CowNo=numpy.asarray(CowNo)
     TagNo=numpy.asarray(TagNo)
-    return TagNo, CowNo, TimeStamp, Ax, Ay, Az, Label
-
-def ReadLabeledDataFile(DataFolder,FileName):
-    Ax=[]
-    Ay=[]
-    Az=[]
-    Label=[]
-    TimeStamp=[]
-    CowNo=[]
-    TagNo=[]
-
-    k=FileName.find('_Tag')+4
-    m=FileName.find('_Cow')
-    l=FileName.find('_',m+2)
-    tagno=FileName[k:m]
-    cowno=FileName[m+4:l]
-
-    with open(DataFolder+"\\"+FileName, mode ='r')as csvfile:
-        csvreader = csv.reader(csvfile, delimiter=";")
-        rows=[]
-        for row in csvreader:
-            rows.append(row)
-
-    for i in range(len(rows)):
-        CowNo.append(cowno)
-        TagNo.append(tagno)
-        # TimeStamp.append(rows[i][0])
-        TimeStamp.append(datetime.strptime(rows[i][0],"%Y-%m-%dT%H:%M:%S.%f").timestamp())
-        Ax.append(int(rows[i][1]))
-        Ay.append(int(rows[i][2]))
-        Az.append(int(rows[i][3]))
-        Label.append(int(rows[i][4]))
-
-    CowNo=list(CowNo)
-    TagNo=list(TagNo)
-    TimeStamp=list(TimeStamp)
-    Label=list(Label)
-    Ax=list(Ax)
-    Ay=list(Ay)
-    Az=list(Az)
-    
-    # Label=numpy.asarray(Label)
-    # CowNo=numpy.asarray(CowNo)
-    # TagNo=numpy.asarray(TagNo)
     return TagNo, CowNo, TimeStamp, Ax, Ay, Az, Label
 
 def LabeledDataSlicing(Ax, Ay, Az, Label, SliceN, Overlap, TagNo, CowNo, TimeStamp):
@@ -183,9 +140,6 @@ def LabeledDataSlicing(Ax, Ay, Az, Label, SliceN, Overlap, TagNo, CowNo, TimeSta
         j=0
         L=Label[i]
         CN=CowNo[i]
-        if CNprev!=CN:
-            CNprev=CN
-            print(CN)
         while i+j<N and Label[i+j]==L and CowNo[i+j]==CN and j<SliceN:
             sliceX[j]=Ax[i+j]
             sliceY[j]=Ay[i+j]
@@ -209,92 +163,123 @@ def LabeledDataSlicing(Ax, Ay, Az, Label, SliceN, Overlap, TagNo, CowNo, TimeSta
 def AccelerationFiltering(Ax, Ay, Az):#WindowN,
     Draw=False#True#
     if Draw:
-        plt.plot(TimeStamp,Ax, 'r.')
-        plt.plot(TimeStamp,Ay, 'r.')
-        plt.plot(TimeStamp,Az, 'r.')
+        plt.plot(range(len(Ax)),Ax, 'r*')
+        plt.plot(range(len(Ax)),Ay, 'g*')
+        plt.plot(range(len(Ax)),Az, 'b*')
+
+    q=[]
+    AX=[]
+    AY=[]
+    AZ=[]
+    for i in range(len(Ax)):
+        if Ax[i]!=0:
+            AX.append(Ax[i])
+            AY.append(Ay[i])
+            AZ.append(Az[i])
+            q.append(i)
+    
+    #filter1
     b = signal.firwin(511, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
-    Ax = signal.lfilter(b, 1.0, Ax)
-    Ay = signal.lfilter(b, 1.0, Ay)
-    Az = signal.lfilter(b, 1.0, Az)
-    # b, a = signal.butter(4, 25, 'low', analog=True)
-    # b, a = signal.butter(4, 0.1)
-    # Ax=signal.filtfilt(b,a,Ax)
-    # Ay=signal.filtfilt(b,a,Ay)
-    # Az=signal.filtfilt(b,a,Az)
+    AX = signal.lfilter(b, 1.0, AX)
+    AY = signal.lfilter(b, 1.0, AY)
+    AZ = signal.lfilter(b, 1.0, AZ)
+    # #filter1
+    # b = signal.firwin(511, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
+    # AX = signal.lfilter(b, 1.0, AX)
+    # AY = signal.lfilter(b, 1.0, AY)
+    # AZ = signal.lfilter(b, 1.0, AZ)
+
+    # #filter2
+    # b = signal.firwin(51, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
+    # AX = signal.lfilter(b, 1.0, AX)
+    # AY = signal.lfilter(b, 1.0, AY)
+    # AZ = signal.lfilter(b, 1.0, AZ)
+
+    # #filter3
+    # b = signal.firwin(511, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
+    # # AX = signal.lfilter(b, 1.0, AX)
+    # AY = signal.lfilter(b, 1.0, AY)
+    # AZ = signal.lfilter(b, 1.0, AZ)
+
+    # # filter 4
+    # b=signal.firwin(51, cutoff = [0.1, 10], fs = 25, window = "hamming", pass_zero=False)
+    # AX = signal.lfilter(b, 1.0, AX)
+    # AY = signal.lfilter(b, 1.0, AY)
+    # AZ = signal.lfilter(b, 1.0, AZ)
+
+    # #filter5
+    # b = signal.firwin(201, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
+    # AX = signal.lfilter(b, 1.0, AX)
+    # AY = signal.lfilter(b, 1.0, AY)
+    # AZ = signal.lfilter(b, 1.0, AZ)
+
+    for i in range(len(q)):
+        Ax[q[i]]=AX[i]
+        Ay[q[i]]=AY[i]
+        Az[q[i]]=AZ[i]
+    
     if Draw:
-        plt.plot(TimeStamp,Ax,'bo')
-        plt.plot(TimeStamp,Ay,'bo')
-        plt.plot(TimeStamp,Az,'bo')
+        plt.plot(range(len(Ax)),Ax,'b.')
+        plt.plot(range(len(Ax)),Ay,'r.')
+        plt.plot(range(len(Ax)),Az,'g.')
         plt.show()
 
     return Ax, Ay, Az
 
-def AccelerationSamplingFitting(Ax, Ay, Az, TimeStamp, Label, TagNo, CowNo, RefFreq):#WindowN,
+def MissingSampleImputation(Ax, Ay, Az, TimeStamp):#, Label, TagNo, CowNo
     Draw=False#True#
     if Draw:
-        plt.plot(TimeStamp,Ax,'bo')
-        plt.plot(TimeStamp,Ay,'bo')
-        plt.plot(TimeStamp,Az,'bo')
+        plt.plot(TimeStamp,Ax, 'r*')
+        plt.plot(TimeStamp,Ay, 'g*')
+        plt.plot(TimeStamp,Az, 'b*')
 
-    dt=1/RefFreq
-    dterr=dt/2
-    TimeStampNew=[]
-    TimeStampNew.append(TimeStamp[0])
     q=[]
-    q.append(0)
-    j=0
-    for i in range(len(TimeStamp)-1):
-        if TimeStamp[i+1]-TimeStampNew[j]<5: #sec
-            while TimeStampNew[j]+dt<TimeStamp[i+1]-dterr:
-                TimeStampNew.append(TimeStampNew[j]+dt)
-                j=j+1
-                q.append(0)
-        TimeStampNew.append(TimeStamp[i+1])
-        j=j+1
-        q.append(i+1)
+    AX=[]
+    AY=[]
+    AZ=[]
+    TS=[]
+    # q.append(0)
+    # AX.append(Ax[0])
+    # AY.append(Ay[0])
+    # AZ.append(Az[0])
+    # TS.append(TimeStamp[0])
+    for i in range(1,len(Ax)-1):
+        if Ax[i]!=0:
+            AX.append(Ax[i])
+            AY.append(Ay[i])
+            AZ.append(Az[i])
+            TS.append(TimeStamp[i])
+            q.append(i)
 
-    # AxNew,AyNew,AzNew=[],[],[]
-    # for i in range(len(TimeStampNew)):
-    #     if q[i]!=0:
-    #         AxNew.append(Ax[q[i]])
-    #         AyNew.append(Ay[q[i]])
-    #         AzNew.append(Az[q[i]])
-    #     else:
-    #         AxNew.append(0)
-    #         AyNew.append(0)
-    #         AzNew.append(0)
-    # Ax=AxNew
-    # Ay=AyNew
-    # Az=AzNew
-
-    f=interpolate.interp1d(TimeStamp,Ax,kind='cubic')
-    Ax=f(TimeStampNew)
-    f=interpolate.interp1d(TimeStamp,Ay,kind='cubic')
-    Ay=f(TimeStampNew)
-    f=interpolate.interp1d(TimeStamp,Az,kind='cubic')
-    Az=f(TimeStampNew)
-    f=interpolate.interp1d(TimeStamp,TagNo,kind='nearest')
-    TagNo=f(TimeStampNew)
-    f=interpolate.interp1d(TimeStamp,CowNo,kind='nearest')
-    CowNo=f(TimeStampNew)
-    f=interpolate.interp1d(TimeStamp,Label,kind='nearest')
-    Label=f(TimeStampNew)
+    f=interpolate.interp1d(TS,AX,kind='cubic',fill_value="extrapolate")
+    Ax=f(TimeStamp)
+    f=interpolate.interp1d(TS,AY,kind='cubic',fill_value="extrapolate")
+    Ay=f(TimeStamp)
+    f=interpolate.interp1d(TS,AZ,kind='cubic',fill_value="extrapolate")
+    Az=f(TimeStamp)
+    # # f=interpolate.interp1d(TimeStamp,TagNo,kind='nearest')
+    # # TagNo=f(TimeStampNew)
+    # # f=interpolate.interp1d(TimeStamp,CowNo,kind='nearest')
+    # # CowNo=f(TimeStampNew)
+    # # f=interpolate.interp1d(TimeStamp,Label,kind='nearest')
+    # # Label=f(TimeStampNew)
 
     if Draw:
-        plt.plot(TimeStampNew,Ax, 'g*')
-        plt.plot(TimeStampNew,Ay, 'g*')
-        plt.plot(TimeStampNew,Az, 'g*')
+        plt.plot(TimeStamp,Ax,'g.')
+        plt.plot(TimeStamp,Ay,'b.')
+        plt.plot(TimeStamp,Az,'r.')
 
         # # plt.figure()
-        # # plt.plot(TimeStampNew,TagNo, 'k.')
-        # # plt.plot(TimeStampNew,CowNo, 'k*')
+        # # plt.plot(TimeStamp,TagNo, 'k.')
+        # # plt.plot(TimeStamp,CowNo, 'k*')
 
         plt.show()
 
-    return Ax, Ay, Az, TimeStampNew, Label, TagNo, CowNo
+    return Ax, Ay, Az
 
 def AccNormalization(A):
-    return A/numpy.std(A)
+    # return A/numpy.std(A)
+    return A/1024
 
 def DataBalance(Ax, Ay, Az, Label, CowNo):#TimeStamp
     N=len(Label)
@@ -461,39 +446,73 @@ def MaxInd(a):
             m=a[i]
     return m,k
 
-def AccAugmentation(Ax0, Ay0, Az0, Label0, CowNo0, RotationXN):
+def AccRotationAugmentation(Ax0, Ay0, Az0, Label0, CowNo0):
     Ax=list()
     Ay=list()
     Az=list()
     Label=list()
     CowNo=list()
-    if RotationXN==0:
-        RotationXN=1
 
-    dRotationX=math.pi/(RotationXN)
     for i in range(len(Ax0)):
         ax0=Ax0[i]
         ay0=Ay0[i]
         az0=Az0[i]
 
-        for Rotation_i in range(RotationXN*0+1):
-            RotA=2*math.pi*numpy.random.rand()
-            s=math.sin(RotA)
-            c=math.cos(RotA)
+        RotA=2*math.pi*numpy.random.rand()
+        s=math.sin(RotA)
+        c=math.cos(RotA)
 
-            # s=math.sin(Rotation_i*dRotationX)
-            # c=math.cos(Rotation_i*dRotationX)
-            ax=ax0
-            ay=ay0*c-az0*s
-            az=ay0*s+az0*c
-            Ax.append(ax)
-            Ay.append(ay)
-            Az.append(az)
-            Label.append(Label0[i])
-            CowNo.append(CowNo0[i])
+        ax=ax0
+        ay=ay0*c-az0*s
+        az=ay0*s+az0*c
+        Ax.append(ax)
+        Ay.append(ay)
+        Az.append(az)
+        Label.append(Label0[i])
+        CowNo.append(CowNo0[i])
 
     (unique, LabelCounts) = numpy.unique(Label, return_counts=True)
-    print("Augmented class distribution: "+str(LabelCounts))
+    # print("Augmented rotation class distribution: "+str(LabelCounts))
+
+    return Ax, Ay, Az, Label, CowNo
+
+def AccSamplingAugmentation(Ax, Ay, Az, Label, CowNo, MaxMissingSamplingRate):
+    n=numpy.shape(Ax)
+    WindowSize=n[1]
+    k=0.05
+    MaxMissingSamples=int(MaxMissingSamplingRate*WindowSize)
+    MinMissingSamples=int(0.05*WindowSize)
+
+    for i in range(len(Ax)):
+        ax0=Ax[i]
+        ay0=Ay[i]
+        az0=Az[i]
+
+        # plt.plot(range(WindowSize), ax0,'b*')
+
+        d=numpy.count_nonzero(ax0==0)
+        if d<WindowSize*k:
+            MissingRate=int(numpy.random.randint(MinMissingSamples,MaxMissingSamples))
+            print(MissingRate)
+            for j in range(int(MissingRate/5)):
+                w=numpy.random.randint(0, WindowSize-1-5)
+                # print(w)
+                ax0[w]=0
+                ay0[w]=0
+                az0[w]=0
+                ax0[w+1],ax0[w+2],ax0[w+3],ax0[w+4]=0,0,0,0
+                ay0[w+1],ay0[w+2],ay0[w+3],ay0[w+4]=0,0,0,0
+                az0[w+1],az0[w+2],az0[w+3],az0[w+4]=0,0,0,0
+            Ax.append(ax0)
+            Ay.append(ay0)
+            Az.append(az0)
+            Label.append(Label[i])
+            CowNo.append(CowNo[i])
+        # plt.plot(range(WindowSize), ax0,'r.')
+        # plt.show()
+
+    (unique, LabelCounts) = numpy.unique(Label, return_counts=True)
+    print("Augmented sampling class distribution: "+str(LabelCounts))
 
     return Ax, Ay, Az, Label, CowNo
 
@@ -524,7 +543,7 @@ def PresentPerformance(LabelReference,LabelPredicted,Classes,ClassNames):
 
     PerfVect=numpy.zeros((ClassN, 3))
     print()
-    TotAcc=round(Ttotal/N*100,2)
+    TotAcc=round(Ttotal/N*100,1)
     print('Total accuracy =',TotAcc,'%, N =',N)
     for j in range(ClassN):
         sens=numpy.squeeze(TP[j]/(TP[j]+FP[j]))
@@ -547,23 +566,125 @@ def PresentPerformance(LabelReference,LabelPredicted,Classes,ClassNames):
     return PerfVect, ConfusionMatr, TotAcc
 
 from scipy.stats import skew, kurtosis
-def AccelerationFeatures(Ax,Ay,Az,Label):
-    Ax_Mean=numpy.mean(Ax, axis=1)
-    Ay_Mean=numpy.mean(Ay, axis=1)
-    Az_Mean=numpy.mean(Az, axis=1)
-    Ax_STD=numpy.std(Ax, axis=1)
-    Ay_STD=numpy.std(Ay, axis=1)
-    Az_STD=numpy.std(Az, axis=1)
+def AccelerationFeatures(Ax,Ay,Az,Label,fs):
+    # Ax_Mean=numpy.mean(Ax, axis=1)
+    # Ay_Mean=numpy.mean(Ay, axis=1)
+    # Az_Mean=numpy.mean(Az, axis=1)
+    # Ax_STD=numpy.std(Ax, axis=1)
+    # Ay_STD=numpy.std(Ay, axis=1)
+    # Az_STD=numpy.std(Az, axis=1)
+    Ax_Mean=numpy.mean(Ax)
+    Ay_Mean=numpy.mean(Ay)
+    Az_Mean=numpy.mean(Az)
+    Ax_STD=numpy.std(Ax)
+    Ay_STD=numpy.std(Ay)
+    Az_STD=numpy.std(Az)
+    Ax_Range=max(Ax)-min(Ax)
+    Ay_Range=max(Ay)-min(Ay)
+    Az_Range=max(Az)-min(Az)
     Ax_Skew=skew(Ax)
     Ay_Skew=skew(Ay)
     Az_Skew=skew(Az)
     Ax_Kurt=kurtosis(Ax)
     Ay_Kurt=kurtosis(Ay)
     Az_Kurt=kurtosis(Az)
+    Ax_Zero_crossings = len(numpy.where(numpy.diff(numpy.signbit(Ax-Ax_Mean)))[0])
+    Ay_Zero_crossings = len(numpy.where(numpy.diff(numpy.signbit(Ay-Ay_Mean)))[0])
+    Az_Zero_crossings = len(numpy.where(numpy.diff(numpy.signbit(Az-Az_Mean)))[0])
+    Ax_Signal_area=sum(Ax)/fs
+    Ay_Signal_area=sum(Ay)/fs
+    Az_Signal_area=sum(Az)/fs
+    f, Ax_Pxx_den = signal.periodogram(Ax, fs)
+    f, Ay_Pxx_den = signal.periodogram(Ay, fs)
+    f, Az_Pxx_den = signal.periodogram(Az, fs)
+
+    b, a = signal.butter(5, 25, 'low', fs=100)
+    Ax_Pxx_den_f = signal.filtfilt(b, a, Ax_Pxx_den)
+    Ay_Pxx_den_f = signal.filtfilt(b, a, Ay_Pxx_den)
+    Az_Pxx_den_f = signal.filtfilt(b, a, Az_Pxx_den)
+
+    # Ax_Spectral_entropy=sum(Ax_Pxx_den*numpy.log(Ax_Pxx_den_f))
+    # Ay_Spectral_entropy=sum(Ay_Pxx_den*numpy.log(Ay_Pxx_den_f))
+    # Az_Spectral_entropy=sum(Az_Pxx_den*numpy.log(Az_Pxx_den_f))
+
+    # Ax_Dominant_frequency=numpy.argmax(Ax_Pxx_den_f)
+    # Ay_Dominant_frequency=numpy.argmax(Ay_Pxx_den_f)
+    # Az_Dominant_frequency=numpy.argmax(Az_Pxx_den_f)
+
+    Ax_Spectral_area=sum(Ax_Pxx_den_f)
+    Ay_Spectral_area=sum(Ay_Pxx_den_f)
+    Az_Spectral_area=sum(Az_Pxx_den_f)
+
+    Ax_Maxima, _ = find_peaks(Ax_Pxx_den_f, distance=30)
+    sort_index = numpy.argsort(-Ax_Pxx_den_f[Ax_Maxima])
+    if len(sort_index)>0:
+        Ax_Dominant_frequency=Ax_Maxima[sort_index[0]]
+    else:
+        Ax_Dominant_frequency=0
+    if len(sort_index)>1:
+        Ax_2_frequency=Ax_Maxima[sort_index[1]]
+    else:
+        Ax_2_frequency=0
+    if len(sort_index)>2:
+        Ax_3_frequency=Ax_Maxima[sort_index[2]]
+    else:
+        Ax_3_frequency=0
+
+    Ay_Maxima, _ = find_peaks(Ay_Pxx_den_f, distance=30)
+    sort_index = numpy.argsort(-Ay_Pxx_den_f[Ay_Maxima])
+    if len(sort_index)>0:
+        Ay_Dominant_frequency=Ay_Maxima[sort_index[0]]
+    else:
+        Ay_Dominant_frequency=0
+    if len(sort_index)>1:
+        Ay_2_frequency=Ay_Maxima[sort_index[1]]
+    else:
+        Ay_2_frequency=0
+    if len(sort_index)>2:
+        Ay_3_frequency=Ay_Maxima[sort_index[2]]
+    else:
+        Ay_3_frequency=0
+
+    Az_Maxima, _ = find_peaks(Az_Pxx_den_f, distance=30)
+    sort_index = numpy.argsort(-Az_Pxx_den_f[Az_Maxima])
+    if len(sort_index)>0:
+        Az_Dominant_frequency=Az_Maxima[sort_index[0]]
+    else:
+        Az_Dominant_frequency=0
+    if len(sort_index)>1:
+        Az_2_frequency=Az_Maxima[sort_index[1]]
+    else:
+        Az_2_frequency=0
+    if len(sort_index)>2:
+        Az_3_frequency=Az_Maxima[sort_index[2]]
+    else:
+        Az_3_frequency=0
+    
     Features=numpy.dstack((Ax_Mean,Ay_Mean,Az_Mean))
     Features=numpy.dstack((Features,Ax_STD,Ay_STD,Az_STD))
-    # Features=numpy.dstack((Features,Ax_Skew,Ay_Skew,Az_Skew))
-    # Features=numpy.dstack((Features,Ax_Kurt,Ay_Kurt,Az_Kurt))
+    Features=numpy.dstack((Features,Ax_Range,Ay_Range,Az_Range))
+    Features=numpy.dstack((Features,Ax_Skew,Ay_Skew,Az_Skew))
+    Features=numpy.dstack((Features,Ax_Kurt,Ay_Kurt,Az_Kurt))
+    Features=numpy.dstack((Features,Ax_Zero_crossings,Ay_Zero_crossings,Az_Zero_crossings))
+    Features=numpy.dstack((Features,Ax_Signal_area,Ay_Signal_area,Az_Signal_area))
+    # Features=numpy.dstack((Features,Ax_Spectral_entropy,Ay_Spectral_entropy,Az_Spectral_entropy))
+    Features=numpy.dstack((Features,Ax_Dominant_frequency,Ay_Dominant_frequency,Az_Dominant_frequency))
+    Features=numpy.dstack((Features,Ax_Spectral_area,Ay_Spectral_area,Az_Spectral_area))
+    Features=numpy.dstack((Features,Ax_2_frequency,Ay_2_frequency,Az_2_frequency))
+    Features=numpy.dstack((Features,Ax_3_frequency,Ay_3_frequency,Az_3_frequency))
+
+    # plt.plot(Ax,'r*')
+    # plt.figure()
+    # plt.plot(Ax_Pxx_den, 'k.')
+    # plt.plot(Ax_Pxx_den_f, 'g')
+    # print(Ax_Maxima)
+    # plt.plot(Ax_Maxima,Ax_Pxx_den_f[Ax_Maxima],'b*')
+    # plt.plot(Ax_Dominant_frequency,Ax_Pxx_den_f[Ax_Dominant_frequency],'ro')
+    # plt.plot(Ax_2_frequency,Ax_Pxx_den_f[Ax_2_frequency],'go')
+    # plt.plot(Ax_3_frequency,Ax_Pxx_den_f[Ax_3_frequency],'bo')
+    # plt.show()
+    # print(Features)
+    # print(Ax_Zero_crossings)
 
     Features=numpy.squeeze(Features)
     Label=numpy.squeeze(Label)
@@ -637,3 +758,125 @@ def AccelerationFeatures(Ax,Ay,Az,Label):
 #         Az.append(float(rows[i][3]))
 #         Timestamp.append(rows[i][0])
 #     return Ax, Ay, Az, Timestamp
+
+# def ReadLabeledDataFile(DataFolder,FileName,RefFreq):
+#     Ax=[]
+#     Ay=[]
+#     Az=[]
+#     Label=[]
+#     TimeStamp=[]
+#     CowNo=[]
+#     TagNo=[]
+
+#     k=FileName.find('_Tag')+4
+#     m=FileName.find('_Cow')
+#     l=FileName.find('_',m+2)
+#     tagno=FileName[k:m]
+#     cowno=FileName[m+4:l]
+
+#     with open(DataFolder+"\\"+FileName, mode ='r')as csvfile:
+#         csvreader = csv.reader(csvfile, delimiter=";")
+#         rows=[]
+#         for row in csvreader:
+#             rows.append(row)
+    
+#     for i in range(len(rows)):
+#         CowNo.append(cowno)
+#         TagNo.append(tagno)
+#         # TimeStamp.append(rows[i][0])
+#         TimeStamp.append(datetime.strptime(rows[i][0],"%Y-%m-%dT%H:%M:%S.%f").timestamp())
+#         Ax.append(int(rows[i][1]))
+#         Ay.append(int(rows[i][2]))
+#         Az.append(int(rows[i][3]))
+#         Label.append(int(rows[i][4]))
+#     for i in range(len(rows)):
+#         cowNo.append(cowno)
+#         tagNo.append(tagno)
+#         # TimeStamp.append(rows[i][0])
+#         timeStamp.append(datetime.strptime(rows[i][0],"%Y-%m-%dT%H:%M:%S.%f").timestamp())
+#         ax.append(int(rows[i][1]))
+#         ay.append(int(rows[i][2]))
+#         az.append(int(rows[i][3]))
+#         label.append(int(rows[i][4]))
+
+#         print(len(TimeStamp))
+#         print(len(Ax))
+#         Ax, Ay, Az=AccelerationFiltering(Ax, Ay, Az)
+#         Ax, Ay, Az, TimeStamp, Label, TagNo, CowNo=AccelerationSamplingFitting(Ax, Ay, Az, TimeStamp, Label, TagNo, CowNo, RefFreq)
+
+#     CowNo=list(CowNo)
+#     TagNo=list(TagNo)
+#     TimeStamp=list(TimeStamp)
+#     Label=list(Label)
+#     Ax=list(Ax)
+#     Ay=list(Ay)
+#     Az=list(Az)
+    
+#     # Label=numpy.asarray(Label)
+#     # CowNo=numpy.asarray(CowNo)
+#     # TagNo=numpy.asarray(TagNo)
+#     return TagNo, CowNo, TimeStamp, Ax, Ay, Az, Label
+
+# def AccelerationSamplingFitting(Ax, Ay, Az, TimeStamp, Label, TagNo, CowNo, RefFreq):#WindowN,
+#     Draw=True#False#
+#     if Draw:
+#         plt.plot(TimeStamp,Ax, 'r*')
+#         plt.plot(TimeStamp,Ay, 'g*')
+#         plt.plot(TimeStamp,Az, 'b*')
+
+#     dt=1/RefFreq
+#     dterr=dt/2
+#     TimeStampNew=[]
+#     TimeStampNew.append(TimeStamp[0])
+#     q=[]
+#     q.append(0)
+#     j=0
+#     for i in range(len(TimeStamp)-1):
+#         if TimeStamp[i+1]-TimeStampNew[j]<5: #sec
+#             while TimeStampNew[j]+dt<TimeStamp[i+1]-dterr:
+#                 TimeStampNew.append(TimeStampNew[j]+dt)
+#                 j=j+1
+#                 q.append(0)
+#         TimeStampNew.append(TimeStamp[i+1])
+#         j=j+1
+#         q.append(i+1)
+
+#     AxNew,AyNew,AzNew=[],[],[]
+#     for i in range(len(TimeStampNew)):
+#         if q[i]!=0:
+#             AxNew.append(Ax[q[i]])
+#             AyNew.append(Ay[q[i]])
+#             AzNew.append(Az[q[i]])
+#         else:
+#             AxNew.append(0)
+#             AyNew.append(0)
+#             AzNew.append(0)
+#     Ax=AxNew
+#     Ay=AyNew
+#     Az=AzNew
+
+#     # f=interpolate.interp1d(TimeStamp,Ax,kind='cubic')
+#     # Ax=f(TimeStampNew)
+#     # f=interpolate.interp1d(TimeStamp,Ay,kind='cubic')
+#     # Ay=f(TimeStampNew)
+#     # f=interpolate.interp1d(TimeStamp,Az,kind='cubic')
+#     # Az=f(TimeStampNew)
+#     f=interpolate.interp1d(TimeStamp,TagNo,kind='nearest')
+#     TagNo=f(TimeStampNew)
+#     f=interpolate.interp1d(TimeStamp,CowNo,kind='nearest')
+#     CowNo=f(TimeStampNew)
+#     f=interpolate.interp1d(TimeStamp,Label,kind='nearest')
+#     Label=f(TimeStampNew)
+
+#     if Draw:
+#         plt.plot(TimeStampNew,Ax,'g.')
+#         plt.plot(TimeStampNew,Ay,'b.')
+#         plt.plot(TimeStampNew,Az,'r.')
+
+#         # # plt.figure()
+#         # # plt.plot(TimeStampNew,TagNo, 'k.')
+#         # # plt.plot(TimeStampNew,CowNo, 'k*')
+
+#         plt.show()
+
+#     return Ax, Ay, Az, TimeStampNew, Label, TagNo, CowNo
