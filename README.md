@@ -14,5 +14,6 @@ Function library *FeedingBehavior_NNlib.py* includes the following models:
 
 # Odred of running the files
 1. Preparing data H5PY files containing the training data by running *Main_FeedingBehaviour_PrepareDatasetH5PY.py*.
-2. Training models for the given ranges of the model types (NN1, NN4), traning datasets (Barn2, BarnP), folds for validation (1..10) by running *Main_FeedingBehaviour_CNNModelBuilding.py*.
-3. Transfer learning of models based on the BarnP dataset by the Barn2 dataset by running *Main_FeedingBehaviour_CNNTransferLearning.py*.
+2. Training models for the ranges of the model types (NN1, NN4), traning datasets (Barn2), window sizes (5..300), folds for validation (1..10) by running *Main_FeedingBehaviour_CNNModelBuilding.py*.
+3. Training model templates for transfer learning based on the BarnP dataset for the ranges of the model types (NN1, NN4), traning dataset (BarnP), window sizes (30,60,90), fold (0) by running *Main_FeedingBehaviour_CNNModelBuilding.py*.
+4. Transfer learning of models based on the BarnP dataset by the Barn2 dataset for the ranges of the model types (NN1, NN4), traning dataset (Barn2), window sizes (30,60,90), frozen layers (0,1,2) by running *Main_FeedingBehaviour_CNNTransferLearning.py*.
