@@ -1,9 +1,9 @@
 import csv
 import numpy
+import tensorflow
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Flatten, Dropout, Conv1D, MaxPooling1D, LSTM, TimeDistributed, GlobalAveragePooling1D
 from tensorflow.keras.utils import to_categorical
-import tensorflow
 import fnmatch, os
 import math
 import datetime
@@ -12,11 +12,10 @@ from scipy import signal
 from scipy import interpolate
 from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
-# python FeedingBehavior_NNlib.py
 
 def CNNModelDefine(ModelName,trainX,trainy):
     n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainy.shape[1]
-    if ModelName=="NN1": #https://machinelearningmastery.com/cnn-models-for-human-activity-recognition-time-series-classification/
+    if ModelName=="CNN2": #https://machinelearningmastery.com/cnn-models-for-human-activity-recognition-time-series-classification/
         model = Sequential()
         model.add(Conv1D(filters=64, kernel_size=3+5*0+11*0, activation='relu', input_shape=(n_timesteps,n_features)))
         model.add(Conv1D(filters=64, kernel_size=3+5*0+11*0, activation='relu'))
@@ -26,7 +25,7 @@ def CNNModelDefine(ModelName,trainX,trainy):
         model.add(Dense(100, activation='relu'))
         model.add(Dense(n_outputs, activation='softmax'))
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    elif ModelName=="NN2": #https://machinelearningmastery.com/how-to-develop-rnn-models-for-human-activity-recognition-time-series-classification/
+    elif ModelName=="LSTMCNN2": #https://machinelearningmastery.com/how-to-develop-rnn-models-for-human-activity-recognition-time-series-classification/
         n_length = 32
         model = Sequential()
         model.add(TimeDistributed(Conv1D(filters=64, kernel_size=3, activation='relu'), input_shape=(None,n_length,n_features)))
@@ -39,7 +38,7 @@ def CNNModelDefine(ModelName,trainX,trainy):
         model.add(Dense(100, activation='relu'))
         model.add(Dense(n_outputs, activation='softmax'))    
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    elif ModelName=="NN3": #Ordóñez 16, https://doi.org/10.3390/s16010115, https://github.com/STRCWearlab/DeepConvLSTM
+    elif ModelName=="LSTMCNN4": #Ordonez 16, https://doi.org/10.3390/s16010115, https://github.com/STRCWearlab/DeepConvLSTM
         model = Sequential()
         model.add(Conv1D(filters=64, kernel_size=5, activation='relu', input_shape = (n_timesteps, n_features)))
         model.add(Conv1D(filters=64, kernel_size=5, activation='relu'))
@@ -50,7 +49,7 @@ def CNNModelDefine(ModelName,trainX,trainy):
         model.add(LSTM(128, activation='tanh'))
         model.add(Dense(n_outputs, activation='softmax', dtype='float32'))
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=["accuracy", "categorical_accuracy"])
-    elif ModelName=="NN4": #Pavlovic 21, 
+    elif ModelName=="CNN4": #Pavlovic 21, 
         model = Sequential()
         model.add(Conv1D(filters=64, kernel_size=32, strides=1, activation='relu', input_shape = (n_timesteps, n_features)))
         model.add(Conv1D(filters=64, kernel_size=32, strides=2, activation='relu'))
@@ -88,7 +87,7 @@ def ReadLabeledDataFiles(DataFolder,Mask,RefFreq):
             timeStamp=[]
             cowNo=[]
             tagNo=[]
-            with open(DataFolder+"\\"+FileName, mode ='r')as csvfile:
+            with open(DataFolder+"/"+FileName, mode ='r')as csvfile:
                 csvreader = csv.reader(csvfile, delimiter=";")
                 rows=[]
                 for row in csvreader:
@@ -178,40 +177,10 @@ def AccelerationFiltering(Ax, Ay, Az):#WindowN,
             AZ.append(Az[i])
             q.append(i)
     
-    #filter1
     b = signal.firwin(511, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
     AX = signal.lfilter(b, 1.0, AX)
     AY = signal.lfilter(b, 1.0, AY)
     AZ = signal.lfilter(b, 1.0, AZ)
-    # #filter1
-    # b = signal.firwin(511, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
-    # AX = signal.lfilter(b, 1.0, AX)
-    # AY = signal.lfilter(b, 1.0, AY)
-    # AZ = signal.lfilter(b, 1.0, AZ)
-
-    # #filter2
-    # b = signal.firwin(51, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
-    # AX = signal.lfilter(b, 1.0, AX)
-    # AY = signal.lfilter(b, 1.0, AY)
-    # AZ = signal.lfilter(b, 1.0, AZ)
-
-    # #filter3
-    # b = signal.firwin(511, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
-    # # AX = signal.lfilter(b, 1.0, AX)
-    # AY = signal.lfilter(b, 1.0, AY)
-    # AZ = signal.lfilter(b, 1.0, AZ)
-
-    # # filter 4
-    # b=signal.firwin(51, cutoff = [0.1, 10], fs = 25, window = "hamming", pass_zero=False)
-    # AX = signal.lfilter(b, 1.0, AX)
-    # AY = signal.lfilter(b, 1.0, AY)
-    # AZ = signal.lfilter(b, 1.0, AZ)
-
-    # #filter5
-    # b = signal.firwin(201, cutoff = 0.1, fs = 25, window = "hamming", pass_zero="highpass")
-    # AX = signal.lfilter(b, 1.0, AX)
-    # AY = signal.lfilter(b, 1.0, AY)
-    # AZ = signal.lfilter(b, 1.0, AZ)
 
     for i in range(len(q)):
         Ax[q[i]]=AX[i]
@@ -341,75 +310,10 @@ def DataBalance(Ax, Ay, Az, Label, CowNo):#TimeStamp
                 LabelBalanced.append(Label_i+1)
                 CowNoBalanced.append(CowNoList[Cow_i])
 
-        # # TimeStampCowNo_i = numpy.array(TimeStamp[q], dtype='datetime64[D]')
-        # # TimeStampListCowNo_i=numpy.unique(TimeStampCowNo_i)
-
-        # a=numpy.array(numpy.squeeze(TimeStamp[q]/(60*60*24)))
-        # print(a)
-
-        # TimeStampCowNo_i = numpy.array(numpy.floor(numpy.squeeze(TimeStamp[q])/(60*60*24)))
-        # TimeStampListCowNo_i=numpy.unique(TimeStampCowNo_i)
-        # for Date_i in range(len(TimeStampListCowNo_i)):
-        #     w=numpy.argwhere(TimeStampCowNo_i==TimeStampListCowNo_i[Date_i])
-        #     AxCowNo_iDate_i=AxCowNo_i[w[:,0]]
-        #     AyCowNo_iDate_i=AyCowNo_i[w[:,0]]
-        #     AzCowNo_iDate_i=AzCowNo_i[w[:,0]]
-        #     LabelCowNo_iDate_i=LabelCowNo_i[w[:,0]]
-        #     for i in range(len(LabelCowNo_iDate_i)):
-        #         AxBalanced.append(numpy.squeeze(AxCowNo_iDate_i[i]))
-        #         AyBalanced.append(numpy.squeeze(AyCowNo_iDate_i[i]))
-        #         AzBalanced.append(numpy.squeeze(AzCowNo_iDate_i[i]))
-        #         LabelBalanced.append(LabelCowNo_iDate_i[i][0])
-        #         CowNoBalanced.append(CowNoList[Cow_i])
-
-        #     (unique, LabelCounts) = numpy.unique(LabelCowNo_iDate_i, return_counts=True)
-        #     print("Cow "+str(CowNoList[Cow_i])+", date "+str(TimeStampListCowNo_i[Date_i])+", classes "+str(LabelCounts))
-        #     LabelCountsMax=numpy.max(LabelCounts)
-        #     for Label_i in range(3):
-        #         e=numpy.argwhere(LabelCowNo_iDate_i==(Label_i+1))
-        #         AxCowNo_iDate_iLabel_i=AxCowNo_iDate_i[e[:,0]]
-        #         AyCowNo_iDate_iLabel_i=AyCowNo_iDate_i[e[:,0]]
-        #         AzCowNo_iDate_iLabel_i=AzCowNo_iDate_i[e[:,0]]
-        #         for j in range(LabelCountsMax-LabelCounts[Label_i]):
-        #             r=numpy.random.randint(LabelCounts[Label_i])
-        #             # ax0=AxCowNo_iDate_iLabel_i[r]
-        #             # ay0=AyCowNo_iDate_iLabel_i[r]
-        #             # az0=AzCowNo_iDate_iLabel_i[r]
-        #             ax0=numpy.squeeze(AxCowNo_iDate_iLabel_i[r])
-        #             ay0=numpy.squeeze(AyCowNo_iDate_iLabel_i[r])
-        #             az0=numpy.squeeze(AzCowNo_iDate_iLabel_i[r])
-        #             RotA=math.pi*numpy.random.rand()
-        #             s=math.sin(RotA)
-        #             c=math.cos(RotA)
-        #             ax=ax0
-        #             ay=ay0*c-az0*s
-        #             az=ay0*s+az0*c
-        #             AxBalanced.append(ax)
-        #             AyBalanced.append(ay)
-        #             AzBalanced.append(az)
-        #             LabelBalanced.append(Label_i+1)
-        #             CowNoBalanced.append(CowNoList[Cow_i])
-
     (unique, LabelCounts) = numpy.unique(LabelBalanced, return_counts=True)
     print("Balanced class distribution: "+str(LabelCounts))
 
     return AxBalanced, AyBalanced, AzBalanced, LabelBalanced, CowNoBalanced
-
-# # for i in range(0,10):
-# #     plt.scatter(range(WindowN), AxSliced[i])
-# #     plt.scatter(range(WindowN), AySliced[i])
-# #     plt.scatter(range(WindowN), AzSliced[i])
-# # for i in range(0,10):
-# #     plt.scatter(range(WindowN*(i-1),WindowN*i), AxSliced[i], color='black')
-# #     plt.scatter(range(WindowN*(i-1),WindowN*i), AySliced[i], color='blue')
-# #     plt.scatter(range(WindowN*(i-1),WindowN*i), AzSliced[i], color='green')
-# # # plt.figure()
-# # # for i in range(0,50):
-# # #     plt.scatter(range(WindowN*(i-1),WindowN*i), AxSliced[i], color='black')
-# # #     plt.scatter(range(WindowN*(i-1),WindowN*i), AySliced[i], color='blue')
-# # #     plt.scatter(range(WindowN*(i-1),WindowN*i), AzSliced[i], color='green')
-# # plt.show()
-
 
 def DataSlicing(Ax, Ay, Az, Timestamp, n):
     AxSliced=list()
@@ -436,15 +340,6 @@ def DataSlicing(Ax, Ay, Az, Timestamp, n):
         i=i+j
 
     return AxSliced, AySliced, AzSliced, TimestampSliced
-
-def MaxInd(a):
-    m=a[0]
-    k=0
-    for i in range(1,len(a)):
-        if m<a[i]:
-            k=i
-            m=a[i]
-    return m,k
 
 def AccRotationAugmentation(Ax0, Ay0, Az0, Label0, CowNo0):
     Ax=list()
@@ -690,193 +585,3 @@ def AccelerationFeatures(Ax,Ay,Az,Label,fs):
     Label=numpy.squeeze(Label)
     return Features,Label
 
-
-
-    
-# def ReadLabeledData(DataFolder,FileName):#
-#     with open(DataFolder+"\\"+FileName, mode ='r')as csvfile:
-#         csvreader = csv.reader(csvfile, delimiter=";")
-#         rows=[]
-#         for row in csvreader:
-#             rows.append(row)
-#     Ax=[]
-#     Ay=[]
-#     Az=[]
-#     Label=[]
-#     TimeStamp=[]
-#     CowNo=[]
-#     TagNo=[]
-#     for i in range(len(rows)):
-#         CowNo.append(int(rows[i][0]))
-#         TagNo.append(int(rows[i][1]))
-#         TimeStamp.append(rows[i][2])
-#         Ax.append(int(rows[i][3]))
-#         Ay.append(int(rows[i][4]))
-#         Az.append(int(rows[i][5]))
-#         Label.append(int(rows[i][6]))
-#     Ax=AccNormalization(Ax)
-#     Ay=AccNormalization(Ay)
-#     Az=AccNormalization(Ay)
-#     Label=numpy.asarray(Label)
-#     return TagNo, CowNo, TimeStamp, Ax, Ay, Az, Label       
-
-# def ReadLabeledCSV(DataFolder,FileName):#
-#     rows = [] 
-#     print(DataFolder+"\\"+FileName)
-#     with open(DataFolder+"\\"+FileName, mode ='r')as csvfile: 
-#         csvreader = csv.reader(csvfile, delimiter=";")
-#         for row in csvreader:
-#             rows.append(row)
-#     Ax=[]
-#     Ay=[]
-#     Az=[]
-#     Label=[]
-#     # TimeStamp=[]
-#     for i in range(len(rows)):
-#         # TimeStamp.append(float(rows[i][0]))
-#         # TimeStamp.append(rows[i][0])
-#         Ax.append(float(rows[i][1]))
-#         Ay.append(float(rows[i][2]))
-#         Az.append(float(rows[i][3]))
-#         Label.append(int(rows[i][4]))
-#     return Ax, Ay, Az, Label#, TimeStamp
-
-# def ReadRuuviCSV(DataFolder,FileName):
-#     rows = [] 
-#     print(DataFolder+"\\"+FileName)
-#     with open(DataFolder+"\\"+FileName, mode ='r')as csvfile: 
-#         csvreader = csv.reader(csvfile, delimiter=";")
-#         for row in csvreader:
-#             rows.append(row)
-#     Ax=[]
-#     Ay=[]
-#     Az=[]
-#     Timestamp=[]
-#     for i in range(len(rows)):
-#         Ax.append(float(rows[i][1]))
-#         Ay.append(float(rows[i][2]))
-#         Az.append(float(rows[i][3]))
-#         Timestamp.append(rows[i][0])
-#     return Ax, Ay, Az, Timestamp
-
-# def ReadLabeledDataFile(DataFolder,FileName,RefFreq):
-#     Ax=[]
-#     Ay=[]
-#     Az=[]
-#     Label=[]
-#     TimeStamp=[]
-#     CowNo=[]
-#     TagNo=[]
-
-#     k=FileName.find('_Tag')+4
-#     m=FileName.find('_Cow')
-#     l=FileName.find('_',m+2)
-#     tagno=FileName[k:m]
-#     cowno=FileName[m+4:l]
-
-#     with open(DataFolder+"\\"+FileName, mode ='r')as csvfile:
-#         csvreader = csv.reader(csvfile, delimiter=";")
-#         rows=[]
-#         for row in csvreader:
-#             rows.append(row)
-    
-#     for i in range(len(rows)):
-#         CowNo.append(cowno)
-#         TagNo.append(tagno)
-#         # TimeStamp.append(rows[i][0])
-#         TimeStamp.append(datetime.strptime(rows[i][0],"%Y-%m-%dT%H:%M:%S.%f").timestamp())
-#         Ax.append(int(rows[i][1]))
-#         Ay.append(int(rows[i][2]))
-#         Az.append(int(rows[i][3]))
-#         Label.append(int(rows[i][4]))
-#     for i in range(len(rows)):
-#         cowNo.append(cowno)
-#         tagNo.append(tagno)
-#         # TimeStamp.append(rows[i][0])
-#         timeStamp.append(datetime.strptime(rows[i][0],"%Y-%m-%dT%H:%M:%S.%f").timestamp())
-#         ax.append(int(rows[i][1]))
-#         ay.append(int(rows[i][2]))
-#         az.append(int(rows[i][3]))
-#         label.append(int(rows[i][4]))
-
-#         print(len(TimeStamp))
-#         print(len(Ax))
-#         Ax, Ay, Az=AccelerationFiltering(Ax, Ay, Az)
-#         Ax, Ay, Az, TimeStamp, Label, TagNo, CowNo=AccelerationSamplingFitting(Ax, Ay, Az, TimeStamp, Label, TagNo, CowNo, RefFreq)
-
-#     CowNo=list(CowNo)
-#     TagNo=list(TagNo)
-#     TimeStamp=list(TimeStamp)
-#     Label=list(Label)
-#     Ax=list(Ax)
-#     Ay=list(Ay)
-#     Az=list(Az)
-    
-#     # Label=numpy.asarray(Label)
-#     # CowNo=numpy.asarray(CowNo)
-#     # TagNo=numpy.asarray(TagNo)
-#     return TagNo, CowNo, TimeStamp, Ax, Ay, Az, Label
-
-# def AccelerationSamplingFitting(Ax, Ay, Az, TimeStamp, Label, TagNo, CowNo, RefFreq):#WindowN,
-#     Draw=True#False#
-#     if Draw:
-#         plt.plot(TimeStamp,Ax, 'r*')
-#         plt.plot(TimeStamp,Ay, 'g*')
-#         plt.plot(TimeStamp,Az, 'b*')
-
-#     dt=1/RefFreq
-#     dterr=dt/2
-#     TimeStampNew=[]
-#     TimeStampNew.append(TimeStamp[0])
-#     q=[]
-#     q.append(0)
-#     j=0
-#     for i in range(len(TimeStamp)-1):
-#         if TimeStamp[i+1]-TimeStampNew[j]<5: #sec
-#             while TimeStampNew[j]+dt<TimeStamp[i+1]-dterr:
-#                 TimeStampNew.append(TimeStampNew[j]+dt)
-#                 j=j+1
-#                 q.append(0)
-#         TimeStampNew.append(TimeStamp[i+1])
-#         j=j+1
-#         q.append(i+1)
-
-#     AxNew,AyNew,AzNew=[],[],[]
-#     for i in range(len(TimeStampNew)):
-#         if q[i]!=0:
-#             AxNew.append(Ax[q[i]])
-#             AyNew.append(Ay[q[i]])
-#             AzNew.append(Az[q[i]])
-#         else:
-#             AxNew.append(0)
-#             AyNew.append(0)
-#             AzNew.append(0)
-#     Ax=AxNew
-#     Ay=AyNew
-#     Az=AzNew
-
-#     # f=interpolate.interp1d(TimeStamp,Ax,kind='cubic')
-#     # Ax=f(TimeStampNew)
-#     # f=interpolate.interp1d(TimeStamp,Ay,kind='cubic')
-#     # Ay=f(TimeStampNew)
-#     # f=interpolate.interp1d(TimeStamp,Az,kind='cubic')
-#     # Az=f(TimeStampNew)
-#     f=interpolate.interp1d(TimeStamp,TagNo,kind='nearest')
-#     TagNo=f(TimeStampNew)
-#     f=interpolate.interp1d(TimeStamp,CowNo,kind='nearest')
-#     CowNo=f(TimeStampNew)
-#     f=interpolate.interp1d(TimeStamp,Label,kind='nearest')
-#     Label=f(TimeStampNew)
-
-#     if Draw:
-#         plt.plot(TimeStampNew,Ax,'g.')
-#         plt.plot(TimeStampNew,Ay,'b.')
-#         plt.plot(TimeStampNew,Az,'r.')
-
-#         # # plt.figure()
-#         # # plt.plot(TimeStampNew,TagNo, 'k.')
-#         # # plt.plot(TimeStampNew,CowNo, 'k*')
-
-#         plt.show()
-
-#     return Ax, Ay, Az, TimeStampNew, Label, TagNo, CowNo
