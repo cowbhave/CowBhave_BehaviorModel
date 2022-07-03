@@ -4,6 +4,8 @@ Models for classificaion of the feeding behavior.
 
 The data for the model training is available at https://zenodo.org/record/6784671 at the folder Labeled25.zip.
 
+The data for pretraning of the trasfer learning model is available at https://zenodo.org/record/4064802.
+
 Function library *FeedingBehavior_NNlib.py* includes the following models:
 
 1. CNN with 2 convolutional layers from https://machinelearningmastery.com/cnn-models-for-human-activity-recognition-time-series-classification/.
