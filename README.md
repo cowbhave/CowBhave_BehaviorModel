@@ -2,7 +2,7 @@
 
 Models for classificaion of the feeding behavior.
 
-The data for the model training is available at https://zenodo.org/record/6784671.
+The data for the model training is available at https://zenodo.org/record/6784671 at the folder Labeled25.zip.
 
 Function library *FeedingBehavior_NNlib.py* includes the following models:
 
