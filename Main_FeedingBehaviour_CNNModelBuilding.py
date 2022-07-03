@@ -1,7 +1,3 @@
-# .\venv\Scripts\activate
-# cd C:\Users\03138529\Dropbox\Luke\CowBhave
-# python Main_FeedingBehaviour_CNNModelBuilding.py
-
 from FeedingBehavior_NNlib import *
 import fnmatch, os
 from sklearn.model_selection import train_test_split
@@ -17,11 +13,12 @@ Freq=25 #Hz
 FeedingM, RuminatingM, NothingM, DrinkingM = 1, 2, 3, 4
 ProjectFolder="D:/CowBhave1/"
 ModelFolder=ProjectFolder+"Models25"
+if not os.path.exists(ModelFolder):
+    os.mkdir(ModelFolder)
 
 ModelType="CNN2"
 print(ModelType)
 DataSetFolder,DataSetName=[],[]
-# DataSetFolder.append(ProjectFolder+"Data_Exp08_11_2019/Labeled10"),DataSetName.append("Barn1")
 DataSetFolder.append(ProjectFolder+"Labeled25"),DataSetName.append("Barn2")
 # DataSetFolder.append(ProjectFolder+"Pavlovic21/Labeled25"),DataSetName.append("BarnP")
 # DataSetFolder.append(ProjectFolder+"Labeled25_60B1"),DataSetName.append("Barn2_60B1")
@@ -44,9 +41,9 @@ DataSetFolder.append(ProjectFolder+"Labeled25"),DataSetName.append("Barn2")
 # DataSetFolder.append(ProjectFolder+"Labeled25_70"),DataSetName.append("Barn2_70")
 # DataSetFolder.append(ProjectFolder+"Labeled25_80"),DataSetName.append("Barn2_80")
 # DataSetFolder.append(ProjectFolder+"Labeled25_90"),DataSetName.append("Barn2_90")
-# WindowSizeList=[5,10,20,30,60,90,120,180,300] #sec
-WindowSizeList=[60] #sec
-FoldN=0
+WindowSizeList=[5,10,20,30,60,90,120,180,300] #sec
+# WindowSizeList=[60] #sec
+FoldN=10
 
 Vers_i=0
 
@@ -70,7 +67,7 @@ for DataSetFolder_i in range(len(DataSetFolder)):
             print(len(LabelSlicedTraining))
 
             print(ModelFileName)
-            epochs, batch_size, verbose = 20+50*0, 32, 0
+            epochs, batch_size, verbose = 50, 32, 1
             model=CNNModelDefine(ModelType,ASlicedTraining,LabelSlicedOneHotTraining)
             print(model.summary())
             train_history = model.fit(ASlicedTraining, LabelSlicedOneHotTraining, epochs=epochs, batch_size=batch_size, verbose=verbose)
