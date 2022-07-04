@@ -585,3 +585,11 @@ def AccelerationFeatures(Ax,Ay,Az,Label,fs):
     Label=numpy.squeeze(Label)
     return Features,Label
 
+def MaxInd(a):
+    m=a[0]
+    k=0
+    for i in range(1,len(a)):
+        if m<a[i]:
+            k=i
+            m=a[i]
+    return m,k
