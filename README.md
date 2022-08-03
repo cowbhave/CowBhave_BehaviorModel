@@ -1,6 +1,6 @@
-# CowBhave_BehaviorModel
+# CNN and transfer learning-based classification model for automated cow’s feeding behaviour recognition from accelerometer data
 
-The repository contains functions for preparing data, training CNN models for cow feeding behavior classification and validation the models. With the help of these functions, dependance between the dataset size and the model accuracy is analyzed.
+Thus repository contains the code for Bloch et al. 2022 preprint "CNN and transfer learning-based classification model for automated cow’s feeding behaviour recognition from accelerometer data" https://doi.org/10.1101/2022.07.03.498612. Code includes functions for preparing data, training CNN models for cow feeding behavior classification and validation the models. With the help of these functions, dependance between the dataset size and the model accuracy is analyzed.
 
 The data for the model training is available at https://zenodo.org/record/6784671 at the folder Labeled25.zip. This dataset was collected in a research barn (called Barn2) during a barn experiment. For analysis of dependance between the dataset size and the model accuracy, partial datasets were used. The partial datasets are created from the original dataset Barn2.
 
